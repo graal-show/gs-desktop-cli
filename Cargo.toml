@@ -1,0 +1,32 @@
+[package]
+name = "gs-desktop-cli"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.90"
+description = "Rust desktop control client for Graal Show"
+license = "MIT"
+repository = "https://github.com/graal-show/gs-desktop-cli"
+
+[[bin]]
+name = "gs-desktop"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+flags2env = { git = "https://github.com/flags-2-env/flags-2-env.git", rev = "8c8465561075a8d7ebb58074b3a8087138e97d8f" }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+uuid = { version = "1", features = ["v4"] }
+
+[lints.rust]
+unsafe_code = "deny"
+unused_must_use = "deny"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
