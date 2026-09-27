@@ -1,0 +1,79 @@
+[help]
+url = "https://github.com/graal-show/gs-desktop-cli"
+columns = ["options", "env", "type", "default", "description"]
+
+[parse]
+stop_at_first_positional = false
+allow_unknown = false
+
+[env]
+ignore = ["GS_DESKTOP_TOKEN"]
+
+[commands.status]
+help = "Show local Graal-Show daemon status."
+
+[commands.doctor]
+help = "Show local daemon diagnostics and JVM-cell counters."
+
+[commands.cells]
+help = "List live JVM cells owned by gs-desktop-daemon."
+
+[commands.retire]
+help = "Retire one tenant + deployment JVM cell."
+
+[commands.retire.flags.tenant]
+env = "GS_DESKTOP_TENANT_ID"
+aliases = ["tenant"]
+type = "string"
+help = "Tenant id of the JVM cell."
+
+[commands.retire.flags.deployment]
+env = "GS_DESKTOP_DEPLOYMENT_ID"
+aliases = ["deployment"]
+type = "string"
+help = "Immutable deployment generation id of the JVM cell."
+
+[commands.invoke]
+help = "Invoke a local deployment through gs-desktop-daemon."
+
+[commands.invoke.flags.tenant]
+env = "GS_DESKTOP_TENANT_ID"
+aliases = ["tenant"]
+type = "string"
+help = "Tenant id for the logical actor invocation."
+
+[commands.invoke.flags.deployment]
+env = "GS_DESKTOP_DEPLOYMENT_ID"
+aliases = ["deployment"]
+type = "string"
+help = "Immutable deployment generation id."
+
+[commands.invoke.flags.payload]
+env = "GS_DESKTOP_PAYLOAD"
+aliases = ["payload"]
+short = "p"
+type = "json"
+default = "{}"
+help = "JSON invocation payload."
+
+[flags.url]
+env = "GS_DESKTOP_DAEMON_URL"
+aliases = ["url"]
+short = "u"
+type = "string"
+default = "http://127.0.0.1:8764"
+help = "Loopback URL of gs-desktop-daemon."
+
+[flags.timeout]
+env = "GS_DESKTOP_TIMEOUT_MS"
+aliases = ["timeout"]
+short = "t"
+type = "integer"
+default = 30000
+help = "Invocation timeout in milliseconds."
+
+[flags.token-file]
+env = "GS_DESKTOP_TOKEN_FILE"
+aliases = ["token-file"]
+type = "string"
+help = "Path to the local daemon bearer-token file; defaults to ~/.graal-show/daemon/token."
