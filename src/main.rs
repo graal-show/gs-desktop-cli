@@ -168,28 +168,38 @@ fn endpoint(base: &Url, path: &str) -> Result<Url> {
         .context("cannot build local daemon endpoint");
 }
 
+fn parse_numeric_loopback_host(host: &str) -> Result<IpAddr> {
+    let normalized = host
+        .strip_prefix('[')
+        .and_then(|value| value.strip_suffix(']'))
+        .unwrap_or(host);
+    let ip = normalized
+        .parse::<IpAddr>()
+        .context("daemon URL host must be a numeric loopback address")?;
+    if !ip.is_loopback() {
+        bail!("daemon URL host must be loopback");
+    }
+    return Ok(ip);
+}
+
 fn validate_loopback_url(raw: &str) -> Result<Url> {
-    let mut url = Url::parse(raw).context("daemon URL is invalid")?;
+    let url = Url::parse(raw).context("daemon URL is invalid")?;
     if url.scheme() != "http" {
         bail!("daemon URL must use http:// on loopback");
     }
     if !url.username().is_empty() || url.password().is_some() {
         bail!("daemon URL must not contain credentials");
     }
+    if url.query().is_some() || url.fragment().is_some() {
+        bail!("daemon URL must not contain query or fragment components");
+    }
+    if url.path() != "/" && !url.path().is_empty() {
+        bail!("daemon URL must be an origin without a path");
+    }
     let host = url
         .host_str()
-        .ok_or_else(|| anyhow!("daemon URL has no host"))?;
-    let loopback = host.eq_ignore_ascii_case("localhost")
-        || host
-            .parse::<IpAddr>()
-            .map(|ip| ip.is_loopback())
-            .unwrap_or(false);
-    if !loopback {
-        bail!("daemon URL must target loopback");
-    }
-    url.set_path("/");
-    url.set_query(None);
-    url.set_fragment(None);
+        .ok_or_else(|| anyhow!("daemon URL must include a host"))?;
+    let _ = parse_numeric_loopback_host(host)?;
     return Ok(url);
 }
 
@@ -272,12 +282,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn daemon_url_must_be_loopback_http() {
+    fn daemon_url_must_be_numeric_loopback_http_origin() {
         assert!(validate_loopback_url("http://127.0.0.1:8764").is_ok());
-        assert!(validate_loopback_url("http://localhost:8764").is_ok());
+        assert!(validate_loopback_url("http://[::1]:8764").is_ok());
         assert!(validate_loopback_url("https://127.0.0.1:8764").is_err());
-        assert!(validate_loopback_url("http://example.com:8764").is_err());
+        assert!(validate_loopback_url("http://localhost:8764").is_err());
+        assert!(validate_loopback_url("http://192.0.2.10:8764").is_err());
         assert!(validate_loopback_url("http://user:pass@127.0.0.1:8764").is_err());
+        assert!(validate_loopback_url("http://127.0.0.1:8764/path").is_err());
+        assert!(validate_loopback_url("http://127.0.0.1:8764?x=1").is_err());
     }
 
     #[test]
