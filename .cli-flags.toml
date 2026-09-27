@@ -1,0 +1,49 @@
+[help]
+url = "https://github.com/graal-show/gs-desktop-cli"
+columns = ["options", "env", "type", "default", "description"]
+
+[parse]
+stop_at_first_positional = false
+allow_unknown = false
+
+[env]
+ignore = ["GS_DESKTOP_TOKEN_FILE"]
+
+[commands.status]
+help = "Show Graal Show local daemon and JVM cell status."
+
+[commands.invoke]
+help = "Invoke one fresh JVM actor inside a tenant+deployment-pinned reusable cell."
+
+[commands.invoke.flags.tenant]
+env = "GS_DESKTOP_TENANT_ID"
+aliases = ["tenant"]
+type = "string"
+help = "Tenant id."
+
+[commands.invoke.flags.deployment]
+env = "GS_DESKTOP_DEPLOYMENT_ID"
+aliases = ["deployment"]
+type = "string"
+help = "Immutable deployment/generation id."
+
+[commands.invoke.flags.payload]
+env = "GS_DESKTOP_PAYLOAD"
+aliases = ["payload"]
+type = "json"
+default = "{}"
+help = "JSON invocation payload."
+
+[flags.url]
+env = "GS_DESKTOP_DAEMON_URL"
+aliases = ["url"]
+type = "string"
+default = "http://127.0.0.1:8764"
+help = "Loopback URL of gs-desktop-daemon."
+
+[flags.timeout]
+env = "GS_DESKTOP_TIMEOUT_MS"
+aliases = ["timeout"]
+type = "integer"
+default = 30000
+help = "Invocation timeout in milliseconds."
