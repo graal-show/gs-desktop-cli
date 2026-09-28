@@ -1,7 +1,7 @@
 {
   "schema": "ores.desktop-generation-consumer/v1",
   "consumer": {"repository": "graal-show/gs-desktop-cli", "role": "desktop_cli"},
-  "authority": {"repository": "ORESoftware/ores-common-desktop-infra", "revision": "895ed4e43f0d9a6bc39dfd4688e0b5009b1c10ef", "pull_request": 9},
+  "authority": {"repository": "ORESoftware/ores-common-desktop-infra", "revision": "6d1202b1feb978343001f034df3cd03928c01b28", "pull_request": 9},
   "lifecycle": ["prepare", "validate", "compile_build_generation", "stage", "health_check", "atomic_activate", "bounded_drain", "commit"],
   "rollback": {"required_before_commit": true, "retain_previous_generation": true},
   "request_semantics": {"new_requests": "active_generation", "existing_requests": "pinned_generation", "generation_identity_required": true},
