@@ -179,8 +179,9 @@ fn validate_daemon_origin(raw: &str) -> Result<String> {
     let host = url
         .host_str()
         .ok_or_else(|| anyhow!("GS_DESKTOP_DAEMON_URL requires a host"))?;
-    let loopback = host.eq_ignore_ascii_case("localhost")
-        || host
+    let normalized_host = host.trim_start_matches('[').trim_end_matches(']');
+    let loopback = normalized_host.eq_ignore_ascii_case("localhost")
+        || normalized_host
             .parse::<IpAddr>()
             .map(|ip| ip.is_loopback())
             .unwrap_or(false);
