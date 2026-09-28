@@ -2,8 +2,17 @@ use anyhow::{Context as _, Result, anyhow, bail};
 use flags2env::BundledFlags2Env;
 use serde::Deserialize;
 use serde_json::{Value, json};
-use std::{collections::HashMap, env, net::IpAddr, path::PathBuf, time::Duration};
+use std::{
+    collections::HashMap,
+    env,
+    fs,
+    path::{Path, PathBuf},
+    time::Duration,
+};
 use uuid::Uuid;
+
+const MAX_RESPONSE_BYTES: usize = 4 * 1024 * 1024;
+const MAX_TOKEN_FILE_BYTES: u64 = 4096;
 
 #[allow(non_snake_case)]
 #[derive(Debug, Deserialize)]
@@ -68,6 +77,7 @@ async fn run() -> Result<()> {
     let token = read_token()?;
     let base = validate_daemon_origin(&config.GS_DESKTOP_DAEMON_URL)?;
     let client = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
         .timeout(Duration::from_millis(timeout_ms.saturating_add(2_000)))
         .build()?;
 
@@ -133,13 +143,31 @@ async fn send_get(client: &reqwest::Client, base: &str, path: &str, token: &str)
 
 async fn print_response(response: reqwest::Response) -> Result<()> {
     let status = response.status();
-    let body = response.text().await?;
+    let body = read_bounded_body(response, MAX_RESPONSE_BYTES).await?;
     if !status.is_success() {
-        bail!("daemon returned {status}: {body}");
+        let text = String::from_utf8_lossy(&body);
+        bail!("daemon returned {status}: {text}");
     }
-    let value: Value = serde_json::from_str(&body).context("daemon response was not JSON")?;
+    let value: Value = serde_json::from_slice(&body).context("daemon response was not JSON")?;
     println!("{}", serde_json::to_string_pretty(&value)?);
     return Ok(());
+}
+
+async fn read_bounded_body(mut response: reqwest::Response, max_bytes: usize) -> Result<Vec<u8>> {
+    if response
+        .content_length()
+        .is_some_and(|length| length > max_bytes as u64)
+    {
+        bail!("daemon response exceeds {max_bytes} bytes");
+    }
+    let mut body = Vec::new();
+    while let Some(chunk) = response.chunk().await? {
+        if body.len().saturating_add(chunk.len()) > max_bytes {
+            bail!("daemon response exceeds {max_bytes} bytes");
+        }
+        body.extend_from_slice(&chunk);
+    }
+    return Ok(body);
 }
 
 fn required(value: Option<String>, flag: &str) -> Result<String> {
@@ -173,22 +201,17 @@ fn validate_daemon_origin(raw: &str) -> Result<String> {
     if url.query().is_some() || url.fragment().is_some() {
         bail!("GS_DESKTOP_DAEMON_URL must not contain query or fragment data");
     }
-    if url.path() != "/" && !url.path().is_empty() {
+    if !matches!(url.path(), "" | "/") {
         bail!("GS_DESKTOP_DAEMON_URL must be an origin without a path");
     }
-    let host = url
-        .host_str()
-        .ok_or_else(|| anyhow!("GS_DESKTOP_DAEMON_URL requires a host"))?;
-    let normalized_host = host.trim_start_matches('[').trim_end_matches(']');
-    let loopback = normalized_host.eq_ignore_ascii_case("localhost")
-        || normalized_host
-            .parse::<IpAddr>()
-            .map(|ip| ip.is_loopback())
-            .unwrap_or(false);
-    if !loopback {
-        bail!("GS_DESKTOP_DAEMON_URL must target loopback");
+    let host = url.host_str().unwrap_or_default();
+    if !matches!(host, "127.0.0.1" | "::1" | "[::1]") {
+        bail!("GS_DESKTOP_DAEMON_URL must use a literal loopback address");
     }
-    return Ok(raw.trim_end_matches('/').to_owned());
+    if url.port().is_none() {
+        bail!("GS_DESKTOP_DAEMON_URL must include an explicit port");
+    }
+    return Ok(url.as_str().trim_end_matches('/').to_owned());
 }
 
 fn resolve_config_path() -> Result<PathBuf> {
@@ -216,13 +239,38 @@ fn read_token() -> Result<String> {
     let path = if let Some(path) = env::var_os("GS_DESKTOP_TOKEN_FILE") {
         PathBuf::from(path)
     } else {
-        let home = env::var_os("HOME").ok_or_else(|| anyhow!("HOME is required"))?;
-        PathBuf::from(home).join(".graal-show/daemon/token")
+        home_dir()?.join(".graal-show/daemon/token")
     };
-    let token = std::fs::read_to_string(&path)
+    return read_token_file(&path);
+}
+
+fn home_dir() -> Result<PathBuf> {
+    return env::var_os("HOME")
+        .or_else(|| env::var_os("USERPROFILE"))
+        .map(PathBuf::from)
+        .ok_or_else(|| anyhow!("HOME/USERPROFILE is required"));
+}
+
+fn read_token_file(path: &Path) -> Result<String> {
+    let metadata = fs::symlink_metadata(path)
+        .with_context(|| format!("cannot inspect daemon token at {}", path.display()))?;
+    if metadata.file_type().is_symlink() || !metadata.is_file() {
+        bail!("daemon token path must be a regular non-symlink file");
+    }
+    if metadata.len() == 0 || metadata.len() > MAX_TOKEN_FILE_BYTES {
+        bail!("daemon token file size is invalid");
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if metadata.permissions().mode() & 0o077 != 0 {
+            bail!("daemon token file must not be accessible by group/other users");
+        }
+    }
+    let token = fs::read_to_string(path)
         .with_context(|| format!("cannot read daemon token at {}", path.display()))?;
     let token = token.trim();
-    if token.len() < 32 || token.chars().any(char::is_whitespace) {
+    if token.len() < 32 || token.len() > 4096 || token.chars().any(char::is_whitespace) {
         bail!("daemon token is invalid");
     }
     return Ok(token.to_owned());
@@ -233,14 +281,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn accepts_only_loopback_http_origins() {
+    fn accepts_only_literal_loopback_http_origins() {
         assert!(validate_daemon_origin("http://127.0.0.1:8764").is_ok());
         assert!(validate_daemon_origin("http://[::1]:8764").is_ok());
-        assert!(validate_daemon_origin("http://localhost:8764").is_ok());
+        assert!(validate_daemon_origin("http://localhost:8764").is_err());
         assert!(validate_daemon_origin("https://127.0.0.1:8764").is_err());
         assert!(validate_daemon_origin("http://example.com:8764").is_err());
         assert!(validate_daemon_origin("http://user:pass@127.0.0.1:8764").is_err());
         assert!(validate_daemon_origin("http://127.0.0.1:8764/v1").is_err());
+        assert!(validate_daemon_origin("http://127.0.0.1").is_err());
     }
 
     #[test]
@@ -249,5 +298,21 @@ mod tests {
         assert!(validate_identifier("deployment", "generation.v1").is_ok());
         assert!(validate_identifier("tenant", "..").is_err());
         assert!(validate_identifier("tenant", "tenant/child").is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn token_reader_rejects_symlink() {
+        use std::os::unix::fs::{PermissionsExt, symlink};
+
+        let root = env::temp_dir().join(format!("gs-cli-token-{}", Uuid::new_v4()));
+        fs::create_dir_all(&root).expect("create test dir");
+        let target = root.join("target");
+        fs::write(&target, "abcdefghijklmnopqrstuvwxyz0123456789\n").expect("write target");
+        fs::set_permissions(&target, fs::Permissions::from_mode(0o600)).expect("chmod target");
+        let link = root.join("token");
+        symlink(&target, &link).expect("create symlink");
+        assert!(read_token_file(&link).is_err());
+        let _ = fs::remove_dir_all(root);
     }
 }
