@@ -12,8 +12,29 @@ ignore = ["GS_DESKTOP_TOKEN_FILE"]
 [commands.status]
 help = "Show Graal Show local daemon and JVM cell status."
 
+[commands.doctor]
+help = "Run the authenticated local daemon diagnostic/status probe."
+
+[commands.cells]
+help = "List reusable JVM cells and their tenant/deployment scope."
+
+[commands.retire]
+help = "Retire one reusable JVM cell for a tenant+deployment generation."
+
+[commands.retire.flags.tenant]
+env = "GS_DESKTOP_TENANT_ID"
+aliases = ["tenant"]
+type = "string"
+help = "Tenant id."
+
+[commands.retire.flags.deployment]
+env = "GS_DESKTOP_DEPLOYMENT_ID"
+aliases = ["deployment"]
+type = "string"
+help = "Immutable deployment/generation id."
+
 [commands.invoke]
-help = "Invoke one fresh JVM actor inside a tenant+deployment-pinned reusable cell."
+help = "Invoke one fresh logical JVM actor inside a tenant+deployment-pinned reusable cell."
 
 [commands.invoke.flags.tenant]
 env = "GS_DESKTOP_TENANT_ID"
@@ -39,11 +60,11 @@ env = "GS_DESKTOP_DAEMON_URL"
 aliases = ["url"]
 type = "string"
 default = "http://127.0.0.1:8764"
-help = "Loopback URL of gs-desktop-daemon."
+help = "Loopback-only HTTP origin of gs-desktop-daemon."
 
 [flags.timeout]
 env = "GS_DESKTOP_TIMEOUT_MS"
 aliases = ["timeout"]
 type = "integer"
 default = 30000
-help = "Invocation timeout in milliseconds."
+help = "Daemon request/invocation timeout in milliseconds."
