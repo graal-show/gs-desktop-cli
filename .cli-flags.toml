@@ -7,7 +7,7 @@ stop_at_first_positional = false
 allow_unknown = false
 
 [env]
-ignore = ["GS_DESKTOP_TOKEN_FILE"]
+ignore = ["GS_DESKTOP_TOKEN"]
 
 [commands.status]
 help = "Show Graal Show local daemon and JVM cell status."
@@ -60,7 +60,7 @@ env = "GS_DESKTOP_DAEMON_URL"
 aliases = ["url"]
 type = "string"
 default = "http://127.0.0.1:8764"
-help = "Loopback-only HTTP origin of gs-desktop-daemon."
+help = "Credential-free literal-loopback HTTP origin of gs-desktop-daemon, including an explicit port."
 
 [flags.timeout]
 env = "GS_DESKTOP_TIMEOUT_MS"
@@ -68,3 +68,9 @@ aliases = ["timeout"]
 type = "integer"
 default = 30000
 help = "Daemon request/invocation timeout in milliseconds."
+
+[flags.token-file]
+env = "GS_DESKTOP_TOKEN_FILE"
+aliases = ["token-file"]
+type = "string"
+help = "Path to the local daemon bearer-token file; defaults to ~/.graal-show/daemon/token."
