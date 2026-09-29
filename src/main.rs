@@ -31,6 +31,17 @@ struct CliConfig {
 
 #[tokio::main]
 async fn main() {
+    if ores_clis_core::self_update::self_update_requested() {
+        ores_clis_core::self_update::run_self_update_cli(
+            ores_clis_core::self_update::SelfUpdateConfig::new(
+                "graal-show",
+                "gs-desktop-cli",
+                "gs-desktop",
+                env!("CARGO_PKG_VERSION"),
+            ),
+        );
+    }
+
     let code = match run().await {
         Ok(()) => 0,
         Err(error) => {
