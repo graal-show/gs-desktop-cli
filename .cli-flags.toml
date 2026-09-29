@@ -12,6 +12,9 @@ ignore = ["GS_DESKTOP_TOKEN"]
 [commands.status]
 help = "Show Graal Show local daemon and JVM cell status."
 
+[commands.self-update]
+help = "Update gs-desktop using the shared ORES self-update path."
+
 [commands.doctor]
 help = "Run the authenticated local daemon diagnostic/status probe."
 
