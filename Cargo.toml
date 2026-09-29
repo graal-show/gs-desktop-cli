@@ -14,6 +14,7 @@ path = "src/main.rs"
 [dependencies]
 anyhow = "1"
 flags2env = { git = "https://github.com/flags-2-env/flags-2-env.git", rev = "8c8465561075a8d7ebb58074b3a8087138e97d8f" }
+ores-clis-core = { git = "https://github.com/ORESoftware/ores-clis-core.git", rev = "a1dbba19330bd293a5df933baffd2028648dd59b" }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
